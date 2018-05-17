@@ -6,7 +6,6 @@ An Ansible role for managing [Apache ActiveMQ](http://activemq.apache.org/) on:
 
 ## Role Variables
 
-
 Install options:
 ```
 version: 5.15.3
