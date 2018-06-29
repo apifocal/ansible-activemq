@@ -1,69 +1,33 @@
 ---
-  
-- name: Create user
-  user:
-    name: "{{ activemq_user }}"
-    system: yes
-    state: present
-  when: activemq_create_user
 
-- name: Download archive
-  unarchive:
-    remote_src: yes
-    src: http://archive.apache.org/dist/activemq/{{ activemq_version }}/apache-activemq-{{ activemq_version }}-bin.tar.gz
-    dest: "{{ activemq_inst }}"
-    owner: root
-    group: root
-    creates: "{{ activemq_inst }}/activemq"
+# TODO: a more comprehensive check, not just $ACTIVEMQ_CONF, fail otherwise
+- stat: path="{{ activemq_base }}/conf"
+  register: conf_base
 
-- name: Move activemq
-  command: mv "{{ activemq_inst }}/apache-activemq-{{ activemq_version }}" "{{ activemq_inst }}/activemq"
-  args:
-    creates: "{{ activemq_inst }}/activemq"
+- name: Install Apache ActiveMQ
+  include_tasks: install.yml
+  when: not conf_base.stat.exists
 
-- name: Create data directory
-  file:
-    path: "{{ activemq_base }}/data"
-    state: directory
-    owner: "{{ activemq_user }}"
-    group: "{{ activemq_user }}"
-    mode: 0775
-
-- name: Create temp directory
-  file:
-    path: "{{ activemq_base }}/tmp"
-    state: directory
-    owner: "{{ activemq_user }}"
-    group: "{{ activemq_user }}"
-    mode: 0775
-
-- stat: path="{{ activemq_inst }}/activemq/conf"
-  register: conf_orig
-
-- name: Move conf to $ACTIVEMQ_BASE
-  command: mv "{{ activemq_inst }}/activemq/conf" "{{ activemq_base }}/conf"
-  args:
-    creates: "{{ activemq_base }}/conf"
-  when: conf_orig.stat.exists == True
-
-- name: Set permissions for $ACTIVEMQ_BASE/conf
-  file:
+# Update ActiveMQ configuration
+- name: Update common ActiveMQ configuration
+  copy:
+    src: "{{ item }}"
     dest: "{{ activemq_base }}/conf"
     owner: "{{ activemq_user }}"
-    group: "{{ activemq_user }}"
-    recurse: yes
+    group: "{{ activemq_group }}"
+    mode: 0644
+  with_fileglob:
+    - "activemq/*"
 
-- name: Create exec symlink
-  file:
-    src: "{{ activemq_inst }}/activemq/bin/activemq"
-    dest: "/usr/local/bin/activemq"
-    state: link
-
-- name: Create systemd service
-  template:
-    src: activemq.service.j2
-    dest: /etc/systemd/system/activemq.service
-  when: activemq_create_service
+- name: Update per host ActiveMQ configuration
+  copy:
+    src: "{{ item }}"
+    dest: "{{ activemq_base }}/conf"
+    owner: "{{ activemq_user }}"
+    group: "{{ activemq_group }}"
+    mode: 0644
+  with_fileglob:
+    - "{{ inventory_hostname }}/activemq/*"
 
 - name: Reload systemd service
   systemd:
@@ -72,4 +36,3 @@
     state: started
     name: activemq
   when: activemq_create_service
-

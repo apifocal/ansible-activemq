@@ -3,5 +3,6 @@ activemq_version: 5.15.3
 activemq_inst: /usr/local/share
 activemq_base: /var/lib/activemq
 activemq_user: activemq
+activemq_group: activemq
 activemq_create_user: yes
 activemq_create_service: yes

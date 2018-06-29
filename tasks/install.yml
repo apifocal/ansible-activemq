@@ -1,0 +1,69 @@
+---
+  
+- name: Create group
+  group:
+    name: "{{ activemq_group }}"
+    state: present
+- name: Create user
+  user:
+    name: "{{ activemq_user }}"
+    group: "{{ activemq_group }}"
+    system: yes
+    state: present
+  when: activemq_create_user
+
+- name: Download archive
+  unarchive:
+    remote_src: yes
+    src: http://archive.apache.org/dist/activemq/{{ activemq_version }}/apache-activemq-{{ activemq_version }}-bin.tar.gz
+    dest: "{{ activemq_inst }}"
+    owner: root
+    group: root
+    creates: "{{ activemq_inst }}/activemq"
+- name: Move activemq
+  command: mv "{{ activemq_inst }}/apache-activemq-{{ activemq_version }}" "{{ activemq_inst }}/activemq"
+  args:
+    creates: "{{ activemq_inst }}/activemq"
+
+- name: Create data directory
+  file:
+    path: "{{ activemq_base }}/data"
+    state: directory
+    owner: "{{ activemq_user }}"
+    group: "{{ activemq_group }}"
+    mode: 0775
+- name: Create temp directory
+  file:
+    path: "{{ activemq_base }}/tmp"
+    state: directory
+    owner: "{{ activemq_user }}"
+    group: "{{ activemq_group }}"
+    mode: 0775
+
+- stat: path="{{ activemq_inst }}/activemq/conf"
+  register: conf_orig
+- name: Move conf to $ACTIVEMQ_BASE
+  command: mv "{{ activemq_inst }}/activemq/conf" "{{ activemq_base }}/conf"
+  args:
+    creates: "{{ activemq_base }}/conf"
+  when: conf_orig.stat.exists
+- name: Set permissions for $ACTIVEMQ_BASE/conf
+  file:
+    dest: "{{ activemq_base }}/conf"
+    owner: "{{ activemq_user }}"
+    group: "{{ activemq_group }}"
+    recurse: yes
+
+- name: Create exec symlink
+  file:
+    src: "{{ activemq_inst }}/activemq/bin/activemq"
+    dest: "/usr/local/bin/activemq"
+    state: link
+
+- name: Create systemd service
+  template:
+    src: activemq.service.j2
+    dest: /etc/systemd/system/activemq.service
+  when: activemq_create_service
+
+# TODO: notify for service restart
